@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九宮格照片自動拼接器 (修正功能版)</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 {
+            color: #4a5568;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .instructions {
+            color: #718096;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 0 10px;
+        }
+
+        .upload-btn {
+            background-color: #4f46e5;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+            display: inline-block;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 4px; 
+            width: 90vw;       
+            height: 90vw;      
+            max-width: 450px;  
+            max-height: 450px;
+            background-color: #fff;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .grid-item {
+            width: 100%;
+            height: 100%;
+            background-color: #edf2f7;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0aec0;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .text-input-container {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            width: 90vw;
+            max-width: 450px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .input-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .input-row label {
+            width: 70px;
+            font-weight: bold;
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+
+        .input-row input, .input-row select {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            background-color: #fff;
+            box-sizing: border-box;
+        }
+
+        .input-row input:focus, .input-row select:focus {
+            border-color: #4f46e5;
+        }
+
+        #other-item-row {
+            display: none; 
+            margin-top: -4px;
+            margin-bottom: 12px;
+        }
+
+        .download-btn {
+            background-color: #10b981;
+            color: white;
+            padding: 14px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            font-size: 1rem;
+            transition: background 0.2s;
+            display: none; 
+            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+            -webkit-appearance: none;
+        }
+
+        #canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>九宮格照片自動拼接器</h1>
+    <div class="instructions">請選取 9 張照片，系統會自動在下方加上分隊、日期與項目紀錄。</div>
+
+    <label class="upload-btn" for="file-input">📱 選取 9 張照片</label>
+    <input type="file" id="file-input" accept="image/*" multiple>
+
+    <div class="grid-container" id="grid-container">
+        <div class="grid-item">1</div><div class="grid-item">2</div><div class="grid-item">3</div>
+        <div class="grid-item">4</div><div class="grid-item">5</div><div class="grid-item">6</div>
+        <div class="grid-item">7</div><div class="grid-item">8</div><div class="grid-item">9</div>
+    </div>
+
+    <div class="text-input-container">
+        <div class="input-row">
+            <label>分隊：</label>
+            <input type="text" id="squad-text" placeholder="例如：麻豆分隊">
+        </div>
+        
+        <div class="input-row">
+            <label>日期：</label>
+            <input type="text" id="date-text" placeholder="例如：6/1">
+        </div>
+        
+        <div class="input-row">
+            <label>項目：</label>
+            <select id="item-select">
+                <option value="車輛器材保養">車輛器材保養</option>
+                <option value="強化救護技能訓練">強化救護技能訓練</option>
+                <option value="體技能訓練">體技能訓練</option>
+                <option value="其他">其他 (自行填寫)...</option>
+            </select>
+        </div>
+
+        <div class="input-row" id="other-item-row">
+            <label></label>
+            <input type="text" id="other-item-text" placeholder="請輸入自訂項目內容">
+        </div>
+    </div>
+
+    <button class="download-btn" id="download-btn">儲存九宮格照片</button>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const gridContainer = document.getElementById('grid-container');
+        const downloadBtn = document.getElementById('download-btn');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const squadInput = document.getElementById('squad-text');
+        const dateInput = document.getElementById('date-text');
+        const itemSelect = document.getElementById('item-select');
+        const otherItemRow = document.getElementById('other-item-row');
+        const otherItemInput = document.getElementById('other-item-text');
+
+        let uploadedImages = [];
+
+        // 頁面載入：初始化與讀取自動記錄資料
+        window.addEventListener('DOMContentLoaded', () => {
+            // 1. 先強制預設日期為當天的「月/日」格式
+            const today = new Date();
+            const currentMonth = today.getMonth() + 1;
+            const currentDate = today.getDate();
+            dateInput.value = `${currentMonth}/${currentDate}`;
+
+            // 2. 讀取儲存的分隊資料
+            if (localStorage.getItem('saved_squad')) {
+                squadInput.value = localStorage.getItem('saved_squad');
+            }
+
+            // 3. 讀取上次選取的項目
+            if (localStorage.getItem('saved_select_item')) {
+                itemSelect.value = localStorage.getItem('saved_select_item');
+                if (itemSelect.value === '開會' || itemSelect.value === '其他') {
+                    // 相容舊版本或觸發其他欄位
+                    if(itemSelect.value === '其他') {
+                        otherItemRow.style.display = 'flex';
+                        otherItemInput.value = localStorage.getItem('saved_other_item') || '';
+                    }
+                }
+            }
+        });
+
+        // 監聽下拉選單切換
+        itemSelect.addEventListener('change', () => {
+            localStorage.setItem('saved_select_item', itemSelect.value);
+            if (itemSelect.value === '其他') {
+                otherItemRow.style.display = 'flex';
+                otherItemInput.focus();
+            } else {
+                otherItemRow.style.display = 'none';
+            }
+        });
+
+        // 【關鍵修正】即時監聽與儲存各個文字輸入欄位，確保不漏字
+        squadInput.addEventListener('input', () => {
+            localStorage.setItem('saved_squad', squadInput.value);
+        });
+        otherItemInput.addEventListener('input', () => {
+            localStorage.setItem('saved_other_item', otherItemInput.value);
+        });
+
+        fileInput.addEventListener('change', handleFiles);
+
+        function handleFiles(e) {
+            const files = Array.from(e.target.files);
+            if (files.length !== 9) {
+                alert(`請剛好選擇 9 張照片！目前選擇了 ${files.length} 張。`);
+                return;
+            }
+            uploadedImages = [];
+            const gridItems = gridContainer.querySelectorAll('.grid-item');
+            let loadedCount = 0;
+
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        uploadedImages[index] = img;
+                        gridItems[index].style.backgroundImage = `url(${event.target.result})`;
+                        gridItems[index].textContent = '';
+                        loadedCount++;
+                        if (loadedCount === 9) { downloadBtn.style.display = 'block'; }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (uploadedImages.length !== 9) return;
+
+            const itemSize = 800; 
+            const gap = 15; 
+            const textSpace = 300; 
+
+            canvas.width = (itemSize * 3) + (gap * 2);
+            canvas.height = (itemSize * 3) + (gap * 2) + textSpace;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            uploadedImages.forEach((img, index) => {
+                const row = Math.floor(index / 3);
+                const col = index % 3;
+                const x = col * (itemSize + gap);
+                const y = row * (itemSize + gap);
+                drawCoverImage(ctx, img, x, y, itemSize, itemSize);
+            });
+
+            // 判定要顯示下拉選單還是自訂文字
+            let finalItem = itemSelect.value;
+            if (finalItem === '其他') {
+                finalItem = otherItemInput.value.trim();
+            }
+
+            const squad = squadInput.value.trim();
+            const date = dateInput.value.trim();
+            const combinedText = squad + date + finalItem;
+
+            if (combinedText) {
+                ctx.fillStyle = '#1e293b'; 
+                ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; 
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const textX = canvas.width / 2;
+                const textY = (itemSize * 3) + (gap * 2) + (textSpace / 2);
+                
+                ctx.fillText(combinedText, textX, textY);
+            }
+
+            const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+            const link = document.createElement('a');
+            link.download = `${combinedText || '九宮格照片'}.jpg`;
+            link.href = dataURL;
+            link.click();
+        });
+
+        function drawCoverImage(ctx, img, x, y, w, h) {
+            const imgRatio = img.width / img.height;
+            const canvasRatio = w / h;
+            let sx, sy, sw, sh;
+            if (imgRatio > canvasRatio) {
+                sh = img.height; sw = img.height * canvasRatio;
+                sx = (img.width - sw) / 2; sy = 0;
+            } else {
+                sw = img.width; sh = img.width / canvasRatio;
+                sx = 0; sy = (img.height - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+        }
+    </script>
+</body>
+</html>
