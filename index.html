@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九宮格照片自動拼接器</title>
+    <title>九宮格照片自動拼接器 (項目提示選擇版)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -141,10 +141,9 @@
             display: none; 
             box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
             -webkit-appearance: none;
-            margin-bottom: 30px; /* 留點空間給下方的頁尾署名 */
+            margin-bottom: 30px;
         }
 
-        /* 新增網頁最下方的頁尾署名樣式 */
         .footer-author {
             color: #94a3b8;
             font-size: 0.8rem;
@@ -187,6 +186,7 @@
         <div class="input-row">
             <label>項目：</label>
             <select id="item-select">
+                <option value="">-- 請選擇項目 --</option>
                 <option value="車輛器材保養">車輛器材保養</option>
                 <option value="救護技能強化訓練">救護技能強化訓練</option>
                 <option value="體技能訓練">體技能訓練</option>
@@ -221,6 +221,7 @@
 
         let uploadedImages = Array(9).fill(null);
 
+        // 頁面載入：初始化資料
         window.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const currentMonth = today.getMonth() + 1;
@@ -231,19 +232,17 @@
                 squadInput.value = localStorage.getItem('saved_squad');
             }
 
-            if (localStorage.getItem('saved_select_item')) {
-                itemSelect.value = localStorage.getItem('saved_select_item');
-                if (itemSelect.value === '其他') {
-                    otherItemRow.style.display = 'flex';
-                    otherItemInput.value = localStorage.getItem('saved_other_item') || '';
-                }
-            }
+            // 【已修改】每次開網頁強制回復到預設的空白提示
+            itemSelect.value = "";
+            otherItemRow.style.display = 'none';
+            otherItemInput.value = "";
         });
 
+        // 監聽下拉選單切換
         itemSelect.addEventListener('change', () => {
-            localStorage.setItem('saved_select_item', itemSelect.value);
             if (itemSelect.value === '其他') {
                 otherItemRow.style.display = 'flex';
+                otherItemInput.value = ""; 
                 otherItemInput.focus();
             } else {
                 otherItemRow.style.display = 'none';
@@ -252,9 +251,6 @@
 
         squadInput.addEventListener('input', () => {
             localStorage.setItem('saved_squad', squadInput.value);
-        });
-        otherItemInput.addEventListener('input', () => {
-            localStorage.setItem('saved_other_item', otherItemInput.value);
         });
 
         fileInput.addEventListener('change', handleFiles);
@@ -322,6 +318,7 @@
                 }
             });
 
+            // 判定項目文字
             let finalItem = itemSelect.value;
             if (finalItem === '其他') {
                 finalItem = otherItemInput.value.trim();
@@ -329,9 +326,10 @@
 
             const squad = squadInput.value.trim();
             const date = dateInput.value.trim();
+            
+            // 【已修改】如果項目是預設空白值，就不帶入任何文字
             const combinedText = squad + date + finalItem;
 
-            // 照片底下的 Canvas 下載檔，只會印這段紀錄大字，不會印署名
             if (combinedText) {
                 ctx.fillStyle = '#1e293b'; 
                 ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; 
