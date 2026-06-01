@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九宮格照片自動拼接器 (修正功能版)</title>
+    <title>九宮格照片自動拼接器 (網頁署名版)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -141,6 +141,17 @@
             display: none; 
             box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
             -webkit-appearance: none;
+            margin-bottom: 30px; /* 留點空間給下方的頁尾署名 */
+        }
+
+        /* 新增網頁最下方的頁尾署名樣式 */
+        .footer-author {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 1px;
         }
 
         #canvas {
@@ -151,9 +162,9 @@
 <body>
 
     <h1>九宮格照片自動拼接器</h1>
-    <div class="instructions">請選取 9 張照片，系統會自動在下方加上分隊、日期與項目紀錄。</div>
+    <div class="instructions">請選取 1~9 張照片，系統會自動依序填入格子，未滿 9 張之處會自動留白。</div>
 
-    <label class="upload-btn" for="file-input">📱 選取 9 張照片</label>
+    <label class="upload-btn" for="file-input">📱 選取照片 (1~9張)</label>
     <input type="file" id="file-input" accept="image/*" multiple>
 
     <div class="grid-container" id="grid-container">
@@ -177,7 +188,7 @@
             <label>項目：</label>
             <select id="item-select">
                 <option value="車輛器材保養">車輛器材保養</option>
-                <option value="強化救護技能訓練">強化救護技能訓練</option>
+                <option value="救護技能強化訓練">救護技能強化訓練</option>
                 <option value="體技能訓練">體技能訓練</option>
                 <option value="其他">其他 (自行填寫)...</option>
             </select>
@@ -190,6 +201,8 @@
     </div>
 
     <button class="download-btn" id="download-btn">儲存九宮格照片</button>
+
+    <div class="footer-author">麻豆分隊  莊伯瀚  製作</div>
 
     <canvas id="canvas"></canvas>
 
@@ -206,35 +219,27 @@
         const otherItemRow = document.getElementById('other-item-row');
         const otherItemInput = document.getElementById('other-item-text');
 
-        let uploadedImages = [];
+        let uploadedImages = Array(9).fill(null);
 
-        // 頁面載入：初始化與讀取自動記錄資料
         window.addEventListener('DOMContentLoaded', () => {
-            // 1. 先強制預設日期為當天的「月/日」格式
             const today = new Date();
             const currentMonth = today.getMonth() + 1;
             const currentDate = today.getDate();
             dateInput.value = `${currentMonth}/${currentDate}`;
 
-            // 2. 讀取儲存的分隊資料
             if (localStorage.getItem('saved_squad')) {
                 squadInput.value = localStorage.getItem('saved_squad');
             }
 
-            // 3. 讀取上次選取的項目
             if (localStorage.getItem('saved_select_item')) {
                 itemSelect.value = localStorage.getItem('saved_select_item');
-                if (itemSelect.value === '開會' || itemSelect.value === '其他') {
-                    // 相容舊版本或觸發其他欄位
-                    if(itemSelect.value === '其他') {
-                        otherItemRow.style.display = 'flex';
-                        otherItemInput.value = localStorage.getItem('saved_other_item') || '';
-                    }
+                if (itemSelect.value === '其他') {
+                    otherItemRow.style.display = 'flex';
+                    otherItemInput.value = localStorage.getItem('saved_other_item') || '';
                 }
             }
         });
 
-        // 監聽下拉選單切換
         itemSelect.addEventListener('change', () => {
             localStorage.setItem('saved_select_item', itemSelect.value);
             if (itemSelect.value === '其他') {
@@ -245,7 +250,6 @@
             }
         });
 
-        // 【關鍵修正】即時監聽與儲存各個文字輸入欄位，確保不漏字
         squadInput.addEventListener('input', () => {
             localStorage.setItem('saved_squad', squadInput.value);
         });
@@ -257,24 +261,35 @@
 
         function handleFiles(e) {
             const files = Array.from(e.target.files);
-            if (files.length !== 9) {
-                alert(`請剛好選擇 9 張照片！目前選擇了 ${files.length} 張。`);
+            
+            if (files.length === 0) return;
+            if (files.length > 9) {
+                alert(`最多只能選擇 9 張照片！目前選擇了 ${files.length} 張。`);
                 return;
             }
-            uploadedImages = [];
+
+            uploadedImages = Array(9).fill(null);
             const gridItems = gridContainer.querySelectorAll('.grid-item');
+            gridItems.forEach((item, i) => {
+                item.style.backgroundImage = 'none';
+                item.textContent = i + 1; 
+            });
+
             let loadedCount = 0;
+            const targetCount = files.length;
 
             files.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     const img = new Image();
                     img.onload = function() {
-                        uploadedImages[index] = img;
+                        uploadedImages[index] = img; 
                         gridItems[index].style.backgroundImage = `url(${event.target.result})`;
                         gridItems[index].textContent = '';
                         loadedCount++;
-                        if (loadedCount === 9) { downloadBtn.style.display = 'block'; }
+                        if (loadedCount === targetCount) { 
+                            downloadBtn.style.display = 'block'; 
+                        }
                     };
                     img.src = event.target.result;
                 };
@@ -283,7 +298,8 @@
         }
 
         downloadBtn.addEventListener('click', () => {
-            if (uploadedImages.length !== 9) return;
+            const hasImage = uploadedImages.some(img => img !== null);
+            if (!hasImage) return;
 
             const itemSize = 800; 
             const gap = 15; 
@@ -300,10 +316,12 @@
                 const col = index % 3;
                 const x = col * (itemSize + gap);
                 const y = row * (itemSize + gap);
-                drawCoverImage(ctx, img, x, y, itemSize, itemSize);
+                
+                if (img !== null) {
+                    drawCoverImage(ctx, img, x, y, itemSize, itemSize);
+                }
             });
 
-            // 判定要顯示下拉選單還是自訂文字
             let finalItem = itemSelect.value;
             if (finalItem === '其他') {
                 finalItem = otherItemInput.value.trim();
@@ -313,6 +331,7 @@
             const date = dateInput.value.trim();
             const combinedText = squad + date + finalItem;
 
+            // 照片底下的 Canvas 下載檔，只會印這段紀錄大字，不會印署名
             if (combinedText) {
                 ctx.fillStyle = '#1e293b'; 
                 ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; 
