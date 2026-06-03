@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九宮格照片自動拼接器 (項目提示選擇版)</title>
+    <title>簡易照片排版拼接</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -48,35 +48,35 @@
             display: none;
         }
 
+        /* 網頁預覽外框：內襯白色背景當作白邊間隙 */
         .grid-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 4px; 
+            position: relative;
             width: 90vw;       
-            height: 90vw;      
             max-width: 450px;  
-            max-height: 450px;
-            background-color: #fff;
+            min-height: 150px;
+            background-color: #ffffff;
             border: 2px solid #e2e8f0;
             border-radius: 8px;
-            overflow: hidden;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
             margin-bottom: 20px;
+            overflow: hidden;
+            transition: height 0.3s ease;
         }
 
-        .grid-item {
-            width: 100%;
-            height: 100%;
-            background-color: #edf2f7;
+        /* 網頁預覽相片塊 */
+        .preview-block {
+            position: absolute;
             background-size: cover;
             background-position: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .placeholder-text {
+            padding: 60px 0;
+            text-align: center;
             color: #a0aec0;
-            font-size: 0.9rem;
             font-weight: bold;
+            font-size: 1.1rem;
         }
 
         .text-input-container {
@@ -160,16 +160,14 @@
 </head>
 <body>
 
-    <h1>九宮格照片自動拼接器</h1>
-    <div class="instructions">請選取 1~9 張照片，系統會自動依序填入格子，未滿 9 張之處會自動留白。</div>
+    <h1>簡易相片拼接器</h1>
+    <div class="instructions">可選擇1~9張照片，依照選擇張數自動平分版面拼接。</div>
 
     <label class="upload-btn" for="file-input">📱 選取照片 (1~9張)</label>
     <input type="file" id="file-input" accept="image/*" multiple>
 
     <div class="grid-container" id="grid-container">
-        <div class="grid-item">1</div><div class="grid-item">2</div><div class="grid-item">3</div>
-        <div class="grid-item">4</div><div class="grid-item">5</div><div class="grid-item">6</div>
-        <div class="grid-item">7</div><div class="grid-item">8</div><div class="grid-item">9</div>
+        <div class="placeholder-text" id="placeholder-text">📸 尚未選取照片</div>
     </div>
 
     <div class="text-input-container">
@@ -200,7 +198,7 @@
         </div>
     </div>
 
-    <button class="download-btn" id="download-btn">儲存九宮格照片</button>
+    <button class="download-btn" id="download-btn">儲存拼接照片</button>
 
     <div class="footer-author">麻豆分隊  莊伯瀚  製作</div>
 
@@ -209,6 +207,7 @@
     <script>
         const fileInput = document.getElementById('file-input');
         const gridContainer = document.getElementById('grid-container');
+        const placeholderText = document.getElementById('placeholder-text');
         const downloadBtn = document.getElementById('download-btn');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -219,26 +218,20 @@
         const otherItemRow = document.getElementById('other-item-row');
         const otherItemInput = document.getElementById('other-item-text');
 
-        let uploadedImages = Array(9).fill(null);
+        let uploadedImages = [];
 
-        // 頁面載入：初始化資料
         window.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
-            const currentMonth = today.getMonth() + 1;
-            const currentDate = today.getDate();
-            dateInput.value = `${currentMonth}/${currentDate}`;
+            dateInput.value = `${today.getMonth() + 1}/${today.getDate()}`;
 
             if (localStorage.getItem('saved_squad')) {
                 squadInput.value = localStorage.getItem('saved_squad');
             }
-
-            // 【已修改】每次開網頁強制回復到預設的空白提示
             itemSelect.value = "";
             otherItemRow.style.display = 'none';
             otherItemInput.value = "";
         });
 
-        // 監聽下拉選單切換
         itemSelect.addEventListener('change', () => {
             if (itemSelect.value === '其他') {
                 otherItemRow.style.display = 'flex';
@@ -255,33 +248,96 @@
 
         fileInput.addEventListener('change', handleFiles);
 
+        // 核心進化：動態計算每排照片寬度，保證每一排都「完美撐滿」且相片「維持正方形」
+        function getFlexLayout(count) {
+            const gap = 25;        // 相片間隙
+            const totalWidth = 2400; // 固定大畫布總寬度為 2400px
+            
+            let rowConfigs = []; 
+            switch (count) {
+                case 1: rowConfigs = [1]; break;
+                case 2: rowConfigs = [2]; break;
+                case 3: rowConfigs = [2, 1]; break;
+                case 4: rowConfigs = [2, 2]; break;
+                case 5: rowConfigs = [3, 2]; break;
+                case 6: rowConfigs = [3, 3]; break;
+                case 7: rowConfigs = [3, 2, 2]; break;
+                case 8: rowConfigs = [3, 3, 2]; break;
+                case 9: rowConfigs = [3, 3, 3]; break;
+            }
+
+            const rects = [];
+            let currentY = gap; // 從最頂部的間隙開始累加高度
+
+            for (let r = 0; r < rowConfigs.length; r++) {
+                const imgCountInRow = rowConfigs[r];
+                
+                // 動態計算這一排每張正方形相片分到的寬度（平分撐滿總寬度，並扣除間隙）
+                const photoSize = (totalWidth - (imgCountInRow + 1) * gap) / imgCountInRow;
+                
+                for (let c = 0; c < imgCountInRow; c++) {
+                    const x = gap + c * (photoSize + gap);
+                    rects.push({
+                        x: x,
+                        y: currentY,
+                        w: photoSize,
+                        h: photoSize // 高度等於寬度，確保絕對正方形
+                    });
+                }
+                
+                // 這一排畫完後，將 Y 軸下移「這一排的相片高度 + 下一個間隙」
+                currentY += photoSize + gap;
+            }
+
+            // 最終累加出來的 currentY 就是相片牆的總高度
+            const totalHeight = currentY; 
+
+            return { totalWidth, totalHeight, rects };
+        }
+
         function handleFiles(e) {
             const files = Array.from(e.target.files);
-            
             if (files.length === 0) return;
             if (files.length > 9) {
-                alert(`最多只能選擇 9 張照片！目前選擇了 ${files.length} 張。`);
+                alert(`最多選取 9 張照片！`);
                 return;
             }
 
-            uploadedImages = Array(9).fill(null);
-            const gridItems = gridContainer.querySelectorAll('.grid-item');
-            gridItems.forEach((item, i) => {
-                item.style.backgroundImage = 'none';
-                item.textContent = i + 1; 
-            });
+            const blocks = gridContainer.querySelectorAll('.preview-block');
+            blocks.forEach(b => b.remove());
+            placeholderText.style.display = 'none';
 
+            uploadedImages = [];
             let loadedCount = 0;
             const targetCount = files.length;
+            
+            const layout = getFlexLayout(targetCount);
+
+            // 根據動態算出來的總長寬比例，調整網頁上手機預覽外框的高度
+            const containerWidth = gridContainer.clientWidth;
+            const scale = containerWidth / layout.totalWidth;
+            gridContainer.style.height = (layout.totalHeight * scale) + 'px';
 
             files.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     const img = new Image();
                     img.onload = function() {
-                        uploadedImages[index] = img; 
-                        gridItems[index].style.backgroundImage = `url(${event.target.result})`;
-                        gridItems[index].textContent = '';
+                        uploadedImages.push(img);
+                        
+                        const div = document.createElement('div');
+                        div.className = 'preview-block';
+                        div.style.backgroundImage = `url(${event.target.result})`;
+                        
+                        // 計算每張正方形圖在手機網頁預覽畫面上的精確百分比位置
+                        const box = layout.rects[index];
+                        div.style.left = (box.x / layout.totalWidth * 100) + '%';
+                        div.style.top = (box.y / layout.totalHeight * 100) + '%';
+                        div.style.width = (box.w / layout.totalWidth * 100) + '%';
+                        div.style.height = (box.h / layout.totalHeight * 100) + '%';
+                        
+                        gridContainer.appendChild(div);
+
                         loadedCount++;
                         if (loadedCount === targetCount) { 
                             downloadBtn.style.display = 'block'; 
@@ -294,42 +350,35 @@
         }
 
         downloadBtn.addEventListener('click', () => {
-            const hasImage = uploadedImages.some(img => img !== null);
-            if (!hasImage) return;
+            if (uploadedImages.length === 0) return;
 
-            const itemSize = 800; 
-            const gap = 15; 
-            const textSpace = 300; 
+            const textSpace = 300; // 底部紀錄文字區塊固定預留高度
+            const layout = getFlexLayout(uploadedImages.length);
 
-            canvas.width = (itemSize * 3) + (gap * 2);
-            canvas.height = (itemSize * 3) + (gap * 2) + textSpace;
+            // 設定 Canvas 總輸出尺寸，文字高度精確疊加
+            canvas.width = layout.totalWidth;
+            canvas.height = layout.totalHeight + textSpace;
 
+            // 背景填滿白色
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // 繪製每張經計算後平分撐滿的正方形照片
             uploadedImages.forEach((img, index) => {
-                const row = Math.floor(index / 3);
-                const col = index % 3;
-                const x = col * (itemSize + gap);
-                const y = row * (itemSize + gap);
-                
-                if (img !== null) {
-                    drawCoverImage(ctx, img, x, y, itemSize, itemSize);
-                }
+                const box = layout.rects[index];
+                drawCoverImage(ctx, img, box.x, box.y, box.w, box.h);
             });
 
-            // 判定項目文字
+            // 文字欄位結合
             let finalItem = itemSelect.value;
             if (finalItem === '其他') {
                 finalItem = otherItemInput.value.trim();
             }
-
             const squad = squadInput.value.trim();
             const date = dateInput.value.trim();
-            
-            // 【已修改】如果項目是預設空白值，就不帶入任何文字
             const combinedText = squad + date + finalItem;
 
+            // 繪製底部大字
             if (combinedText) {
                 ctx.fillStyle = '#1e293b'; 
                 ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; 
@@ -337,14 +386,14 @@
                 ctx.textBaseline = 'middle';
                 
                 const textX = canvas.width / 2;
-                const textY = (itemSize * 3) + (gap * 2) + (textSpace / 2);
+                const textY = layout.totalHeight + (textSpace / 2);
                 
                 ctx.fillText(combinedText, textX, textY);
             }
 
             const dataURL = canvas.toDataURL('image/jpeg', 0.9);
             const link = document.createElement('a');
-            link.download = `${combinedText || '九宮格照片'}.jpg`;
+            link.download = `${combinedText || '平分撐滿拼接'}.jpg`;
             link.href = dataURL;
             link.click();
         });
